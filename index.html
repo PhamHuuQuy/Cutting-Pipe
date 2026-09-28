@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tính cắt ống thép tối ưu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#EDF0F3; --panel:#FFFFFF; --ink:#17202B; --muted:#5E6B7A; --line:#D3D9E0;
+  --steel-a:#B9C4CF; --steel-b:#8796A6; --steel-c:#6A7A8B;
+  --accent:#F2B705; --accent-ink:#231A00; --waste:#C8443A; --keep:#2F7D4F; --field:#F6F8FA;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#11161C; --panel:#19212A; --ink:#E5EAEF; --muted:#9AA7B4; --line:#2C3743;
+    --steel-a:#7F8E9D; --steel-b:#5D6C7C; --steel-c:#46535F;
+    --accent:#F5C23A; --accent-ink:#1E1600; --waste:#E36A5F; --keep:#62B982; --field:#121920;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#11161C; --panel:#19212A; --ink:#E5EAEF; --muted:#9AA7B4; --line:#2C3743;
+  --steel-a:#7F8E9D; --steel-b:#5D6C7C; --steel-c:#46535F;
+  --accent:#F5C23A; --accent-ink:#1E1600; --waste:#E36A5F; --keep:#62B982; --field:#121920;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"Be Vietnam Pro",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  font-size:15px;line-height:1.5;font-variant-numeric:tabular-nums}
+.wrap{max-width:1240px;margin:0 auto;padding:20px 16px 48px}
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:18px}
+h1{font-size:clamp(24px,3.4vw,34px);line-height:1.1;margin:0;font-weight:800;letter-spacing:-.02em}
+.sub{margin:6px 0 0;color:var(--muted);max-width:62ch}
+.stockbar{height:14px;border-radius:7px;width:min(320px,100%);
+  background:linear-gradient(180deg,var(--steel-a),var(--steel-b) 55%,var(--steel-c));position:relative}
+.stockbar::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 calc(20% - 2px),var(--accent) calc(20% - 2px) 20%)}
+.grid{display:grid;gap:18px}
+@media (min-width:980px){.grid{grid-template-columns:minmax(360px,440px) 1fr;align-items:start}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
+.panel h2{font-size:17px;margin:0 0 12px;font-weight:700}
+.settings{display:grid;grid-template-columns:repeat(2,1fr);gap:10px 12px;margin-bottom:18px}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
+input,textarea{font:inherit;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:6px;padding:7px 9px;width:100%;min-width:0}
+input:focus-visible,textarea:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.tablewrap{overflow-x:auto;max-height:52vh;overflow-y:auto;border:1px solid var(--line);border-radius:8px}
+table.list{border-collapse:collapse;width:100%;min-width:360px}
+table.list th{position:sticky;top:0;background:var(--panel);font-size:12px;font-weight:600;color:var(--muted);text-align:left;padding:6px;border-bottom:1px solid var(--line);z-index:1}
+table.list td{padding:3px 4px;border-bottom:1px solid var(--line)}
+table.list td input{padding:5px 6px;border-color:transparent;background:transparent}
+table.list td input:hover{border-color:var(--line)}
+table.list .n{width:74px}.list .q{width:56px}.list .x{width:30px}
+table.list td.idx{color:var(--muted);font-size:12px;width:28px;text-align:right;padding-right:6px}
+.btn{font:inherit;font-weight:600;cursor:pointer;border-radius:6px;padding:8px 12px;border:1px solid var(--line);background:var(--panel);color:var(--ink)}
+.btn:hover{border-color:var(--steel-b)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-size:16px;padding:11px 16px;width:100%;margin-top:14px}
+.btn.primary:hover{filter:brightness(1.05)}
+.btn.small{padding:5px 10px;font-size:13px;font-weight:500}
+.del{background:none;border:0;color:var(--muted);cursor:pointer;font-size:16px;padding:2px 6px;border-radius:4px}
+.del:hover{color:var(--waste)}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.meta{font-size:13px;color:var(--muted);margin:8px 0}
+.paste{margin-top:10px;display:none}
+.paste.open{display:block}
+.paste textarea{height:130px;font-size:13px}
+.hint{font-size:12.5px;color:var(--muted);margin:6px 0}
+.err{background:color-mix(in srgb,var(--waste) 12%,transparent);border-left:3px solid var(--waste);padding:10px 12px;border-radius:6px;margin-bottom:14px;font-size:14px}
+.err ul{margin:6px 0 0;padding-left:18px}
+.empty{padding:40px 12px;text-align:center;color:var(--muted)}
+.empty strong{display:block;color:var(--ink);font-size:17px;margin-bottom:6px}
+.totals{display:flex;flex-wrap:wrap;gap:10px 28px;padding-bottom:14px;margin-bottom:6px;border-bottom:1px solid var(--line)}
+.totals div{display:flex;flex-direction:column}
+.totals b{font-size:28px;line-height:1.1;font-weight:800}
+.totals span{font-size:13px;color:var(--muted)}
+.totals .main b{color:var(--ink);font-size:40px}
+.stale{background:color-mix(in srgb,var(--accent) 22%,transparent);padding:8px 12px;border-radius:6px;font-size:14px;margin-bottom:12px}
+.group{margin-top:22px}
+.ghead{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 16px;margin-bottom:10px}
+.ghead h3{margin:0;font-size:20px;font-weight:800}
+.ghead .gstat{font-size:14px;color:var(--muted)}
+.ghead .gstat b{color:var(--ink)}
+.badge{display:inline-block;font-size:12.5px;padding:2px 8px;border-radius:20px;margin-left:6px;font-weight:600}
+.badge.ok{background:color-mix(in srgb,var(--keep) 18%,transparent);color:var(--keep)}
+.badge.lb{background:color-mix(in srgb,var(--accent) 22%,transparent);color:var(--ink)}
+.pat{display:grid;grid-template-columns:62px 1fr;gap:12px;padding:12px 0;border-top:1px dashed var(--line)}
+.times{text-align:center;align-self:start;border:2px solid var(--ink);border-radius:8px;padding:4px 0}
+.times b{display:block;font-size:22px;line-height:1.1;font-weight:800}
+.times span{font-size:11px;color:var(--muted)}
+.bar{display:flex;height:34px;border-radius:5px;overflow:hidden;background:var(--field);border:1px solid var(--line)}
+.bar .pc{background:linear-gradient(180deg,var(--steel-a),var(--steel-b) 55%,var(--steel-c));color:#fff;font-size:12px;font-weight:600;
+  display:flex;align-items:center;justify-content:center;overflow:hidden;white-space:nowrap;text-shadow:0 1px 1px rgba(0,0,0,.45);min-width:2px}
+.bar .pc:nth-child(4n+3){filter:brightness(.92)}
+.bar .kf{background:var(--accent);min-width:2px}
+.bar .tr{background:repeating-linear-gradient(135deg,var(--line) 0 4px,transparent 4px 8px)}
+.bar .lf{flex:1 1 auto;display:flex;align-items:center;justify-content:center;font-size:11.5px;overflow:hidden;white-space:nowrap}
+.bar .lf.w{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--waste) 30%,transparent) 0 5px,transparent 5px 10px);color:var(--waste)}
+.bar .lf.k{background:color-mix(in srgb,var(--keep) 16%,transparent);color:var(--keep)}
+.pinfo{font-size:14px;margin-top:6px}
+.pinfo .left.w{color:var(--waste);font-weight:600}.pinfo .left.k{color:var(--keep);font-weight:600}
+details.codes{margin-top:4px;font-size:13px;color:var(--muted)}
+details.codes summary{cursor:pointer}
+details.codes ol{margin:4px 0 0;padding-left:22px}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;color:var(--muted);margin:10px 0 0}
+.legend i{display:inline-block;width:14px;height:10px;border-radius:2px;margin-right:5px;vertical-align:middle}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--panel);padding:9px 16px;border-radius:8px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.show{opacity:1}
+@media (max-width:520px){.settings{grid-template-columns:1fr 1fr}.pat{grid-template-columns:50px 1fr}.totals .main b{font-size:32px}}
+@media print{.inputs,.actions,.btn{display:none!important}.grid{display:block}.panel{border:0}body{background:#fff}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Tính cắt ống thép tối ưu</h1>
+      <p class="sub">Nhập các đoạn cần cắt theo từng loại ống. Ứng dụng ghép các đoạn lên cây ống sao cho dùng ít cây nhất và chỉ rõ đoạn nào cắt chung cây với đoạn nào.</p>
+    </div>
+    <div class="stockbar" aria-hidden="true"></div>
+  </header>
+
+  <div class="grid">
+    <section class="panel inputs">
+      <h2>Thông số cây ống</h2>
+      <div class="settings">
+        <label class="f">Chiều dài cây ống (mm)<input id="sStock" type="number" min="100" step="1"></label>
+        <label class="f">Bề dày lưỡi cưa (mm)<input id="sKerf" type="number" min="0" step="0.5"></label>
+        <label class="f">Cắt bỏ đầu cây (mm)<input id="sTrim" type="number" min="0" step="1"></label>
+        <label class="f">Đoạn thừa ≥ (mm) giữ lại tồn kho<input id="sReuse" type="number" min="0" step="10"></label>
+      </div>
+
+      <h2>Danh sách đoạn cần cắt</h2>
+      <div class="row">
+        <button class="btn small" id="bAdd">Thêm dòng</button>
+        <button class="btn small" id="bPaste">Dán từ Excel</button>
+        <button class="btn small" id="bImport">Nhập file Excel</button>
+        <button class="btn small" id="bSample">Dữ liệu mẫu</button>
+        <button class="btn small" id="bClear">Xoá hết</button>
+        <input type="file" id="fileIn" accept=".xlsx,.xls,.csv" hidden>
+      </div>
+      <div class="paste" id="pasteBox">
+        <p class="hint">Copy các cột từ Excel theo thứ tự: <b>Loại ống</b>, <b>Chiều dài (mm)</b>, <b>Số lượng</b>, <b>Mã đoạn</b> (không bắt buộc), rồi dán vào ô dưới.</p>
+        <textarea id="pasteTxt" placeholder="Ø60x3	2450	4	TR-01&#10;Ø60x3	1320	6	TR-02&#10;Ø90x3.5	3100	2	GIA-05"></textarea>
+        <div class="row" style="margin-top:6px"><button class="btn small" id="bPasteAdd">Thêm vào danh sách</button><button class="btn small" id="bPasteCancel">Đóng</button></div>
+      </div>
+      <p class="meta" id="rowMeta"></p>
+      <div class="tablewrap">
+        <table class="list">
+          <thead><tr><th></th><th>Loại ống</th><th class="n">Dài (mm)</th><th class="q">SL</th><th>Mã đoạn</th><th class="x"></th></tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <p class="hint">Các dòng cùng tên "Loại ống" được tính chung trên một loại cây. Dữ liệu được lưu lại trên trình duyệt này.</p>
+      <button class="btn primary" id="bRun">Tính phương án cắt</button>
+    </section>
+
+    <section class="panel" id="results">
+      <div class="empty"><strong>Chưa có phương án cắt</strong>Nhập danh sách đoạn ống bên trái rồi bấm "Tính phương án cắt". Chưa có dữ liệu? Bấm "Dữ liệu mẫu" để thử.</div>
+    </section>
+  </div>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const nf = new Intl.NumberFormat('vi-VN');
+const fmt = n => nf.format(Math.round(n));
+const fmt1 = n => new Intl.NumberFormat('vi-VN',{maximumFractionDigits:1,minimumFractionDigits:1}).format(n);
+const fmt2 = n => new Intl.NumberFormat('vi-VN',{maximumFractionDigits:2,minimumFractionDigits:2}).format(n);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+let S = {stock:6000, kerf:3, trim:0, reuse:500};
+let rows = [];
+let result = null, dirty = false;
+let downloads = null;
+
+function load(){ try{ const d = JSON.parse(localStorage.getItem('cat-ong-v1')||'null'); if(d){ S = {...S, ...d.S}; rows = Array.isArray(d.rows)? d.rows : []; } }catch(e){} }
+function save(){ try{ localStorage.setItem('cat-ong-v1', JSON.stringify({S, rows})); }catch(e){} }
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('show'),2400); }
+
+function parseNum(v){
+  if (typeof v === 'number') return v;
+  let s = String(v ?? '').replace(/\s|mm/gi,'');
+  if (!s) return NaN;
+  if (/^\d{1,3}([.,]\d{3})+$/.test(s)) s = s.replace(/[.,]/g,'');
+  else s = s.replace(',', '.');
+  return /^-?\d+(\.\d+)?$/.test(s) ? parseFloat(s) : NaN;
+}
+
+/* ---------- Input table ---------- */
+function renderRows(){
+  $('#tbody').innerHTML = rows.map((r,i)=>`<tr>
+    <td class="idx">${i+1}</td>
+    <td><input data-i="${i}" data-k="type" value="${esc(r.type)}" placeholder="VD: Ø60x3"></td>
+    <td class="n"><input data-i="${i}" data-k="len" value="${esc(r.len)}" inputmode="decimal"></td>
+    <td class="q"><input data-i="${i}" data-k="qty" value="${esc(r.qty)}" inputmode="numeric"></td>
+    <td><input data-i="${i}" data-k="code" value="${esc(r.code)}"></td>
+    <td class="x"><button class="del" data-del="${i}" aria-label="Xoá dòng ${i+1}">✕</button></td></tr>`).join('');
+  updateMeta();
+}
+function updateMeta(){
+  let pcs=0, types=new Set();
+  rows.forEach(r=>{ const q=parseNum(r.qty); if(q>0 && parseNum(r.len)>0){ pcs+=q; types.add(normType(r.type)); } });
+  $('#rowMeta').textContent = rows.length ? `${rows.length} dòng, ${fmt(pcs)} đoạn, ${types.size} loại ống` : 'Danh sách đang trống.';
+}
+function normType(t){ return String(t||'').trim().replace(/\s+/g,' ') || 'Ống (chưa đặt tên)'; }
+function markDirty(){ dirty = true; const s=$('#staleNote'); if(s) s.hidden=false; }
+
+$('#tbody').addEventListener('input', e=>{
+  const el=e.target; if(!el.dataset.k) return;
+  rows[+el.dataset.i][el.dataset.k] = el.value; save(); updateMeta(); markDirty();
+});
+$('#tbody').addEventListener('click', e=>{
+  const b=e.target.closest('[data-del]'); if(!b) return;
+  rows.splice(+b.dataset.del,1); save(); renderRows(); markDirty();
+});
+$('#bAdd').onclick = ()=>{
+  const last = rows[rows.length-1];
+  rows.push({type: last? last.type : '', len:'', qty:'1', code:''}); save(); renderRows(); markDirty();
+  const inputs = document.querySelectorAll(`[data-i="${rows.length-1}"]`); (inputs[1]||inputs[0])?.focus();
+};
+$('#bClear').onclick = ()=>{ if(!rows.length) return; if(confirm('Xoá toàn bộ danh sách đoạn ống?')){ rows=[]; save(); renderRows(); markDirty(); } };
+$('#bSample').onclick = ()=>{
+  rows = [
+    {type:'Ø60x3',len:'2450',qty:'8',code:'TR-01'},{type:'Ø60x3',len:'1320',qty:'10',code:'TR-02'},
+    {type:'Ø60x3',len:'980',qty:'14',code:'TR-03'},{type:'Ø60x3',len:'3550',qty:'5',code:'TR-04'},
+    {type:'Ø60x3',len:'610',qty:'12',code:'TR-05'},
+    {type:'Ø90x3.5',len:'4200',qty:'3',code:'GIA-01'},{type:'Ø90x3.5',len:'1750',qty:'7',code:'GIA-02'},
+    {type:'Ø90x3.5',len:'2900',qty:'4',code:'GIA-03'},{type:'Ø90x3.5',len:'850',qty:'9',code:'GIA-04'},
+    {type:'Ø42x2.5',len:'1500',qty:'16',code:'LC-01'},{type:'Ø42x2.5',len:'2200',qty:'6',code:'LC-02'},{type:'Ø42x2.5',len:'720',qty:'11',code:'LC-03'}
+  ];
+  save(); renderRows(); markDirty(); toast('Đã nạp dữ liệu mẫu');
+};
+
+/* ---------- Paste / import ---------- */
+function rowsFromCells(table){
+  const out=[];
+  for(const raw of table){
+    const cells = raw.map(c => String(c ?? '').trim());
+    if (!cells.some(c=>c)) continue;
+    let k = cells.findIndex(c => !isNaN(parseNum(c)) && c!=='');
+    if (k < 0) continue;                       // header or text-only row
+    const len = parseNum(cells[k]);
+    if (!(len>0)) continue;
+    const qn = parseNum(cells[k+1]);
+    const qty = qn>0 ? qn : 1;
+    const type = cells.slice(0,k).filter(Boolean).join(' ');
+    const code = cells.slice(qn>0 ? k+2 : k+1).filter(Boolean).join(' ');
+    out.push({type, len:String(len), qty:String(qty), code});
+  }
+  return out;
+}
+$('#bPaste').onclick = ()=>{ $('#pasteBox').classList.toggle('open'); $('#pasteTxt').focus(); };
+$('#bPasteCancel').onclick = ()=> $('#pasteBox').classList.remove('open');
+$('#bPasteAdd').onclick = ()=>{
+  const txt = $('#pasteTxt').value;
+  const table = txt.split(/\r?\n/).map(l => l.includes('\t') ? l.split('\t') : l.split(/;|\s{2,}|\|/));
+  const add = rowsFromCells(table);
+  if(!add.length){ toast('Không đọc được dòng nào. Kiểm tra lại thứ tự cột.'); return; }
+  rows = rows.filter(r => r.type||r.len||r.code).concat(add); save(); renderRows(); markDirty();
+  $('#pasteTxt').value=''; $('#pasteBox').classList.remove('open'); toast(`Đã thêm ${add.length} dòng`);
+};
+$('#bImport').onclick = ()=>{ if(!window.XLSX){ toast('Chưa tải được thư viện Excel. Hãy dùng "Dán từ Excel".'); return; } $('#fileIn').click(); };
+$('#fileIn').onchange = async e=>{
+  const f = e.target.files[0]; if(!f) return;
+  try{
+    const wb = XLSX.read(await f.arrayBuffer(), {type:'array'});
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const add = rowsFromCells(XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:''}));
+    if(!add.length){ toast('Sheet đầu tiên không có dòng hợp lệ.'); return; }
+    rows = rows.filter(r => r.type||r.len||r.code).concat(add); save(); renderRows(); markDirty();
+    toast(`Đã nhập ${add.length} dòng từ ${f.name}`);
+  }catch(err){ toast('Không đọc được file: ' + err.message); }
+  e.target.value='';
+};
+
+/* ---------- Settings ---------- */
+const sMap = {sStock:'stock', sKerf:'kerf', sTrim:'trim', sReuse:'reuse'};
+for(const id in sMap){
+  const el = document.getElementById(id); el.value = S[sMap[id]];
+  el.addEventListener('input', ()=>{ const v=parseNum(el.value); if(v>=0){ S[sMap[id]]=v; save(); markDirty(); } });
+}
+
+/* ---------- Solver (1D cutting stock) ----------
+   Units: integer tenths of a mm, so a 2.5 mm blade is exact.
+   Each piece consumes (length + kerf); usable capacity is (stock - trim + kerf). */
+function maxFill(w, cnt, cap){
+  if (cap <= 0) return new Array(w.length).fill(0);
+  const items=[];
+  for(let i=0;i<w.length;i++){ let c=cnt[i], k=1; while(c>0){ const t=Math.min(k,c); if(t*w[i]<=cap) items.push([i,t,t*w[i]]); c-=t; k*=2; } }
+  const reach=new Uint8Array(cap+1), from=new Int32Array(cap+1), prev=new Int32Array(cap+1);
+  reach[0]=1;
+  outer: for(let j=0;j<items.length;j++){
+    const wt=items[j][2];
+    for(let c=cap;c>=wt;c--){ if(!reach[c] && reach[c-wt]){ reach[c]=1; from[c]=j; prev[c]=c-wt; } }
+    if(reach[cap]) break outer;
+  }
+  let best=cap; while(best>0 && !reach[best]) best--;
+  const use=new Array(w.length).fill(0);
+  for(let c=best;c>0;c=prev[c]){ const it=items[from[c]]; use[it[0]]+=it[1]; }
+  return use;
+}
+function seqHeuristic(w, cnt0, C, forceLargest){
+  const cnt=cnt0.slice(), pats=[];
+  let left=cnt.reduce((a,b)=>a+b,0);
+  while(left>0){
+    let use;
+    if(forceLargest){
+      const i0=cnt.findIndex(c=>c>0); cnt[i0]--;
+      use=maxFill(w,cnt,C-w[i0]); use[i0]++; cnt[i0]++;
+    } else use=maxFill(w,cnt,C);
+    if(!use.some(x=>x>0)) break;
+    let times=Infinity; use.forEach((u,i)=>{ if(u>0) times=Math.min(times, Math.floor(cnt[i]/u)); });
+    use.forEach((u,i)=>{ cnt[i]-=u*times; left-=u*times; });
+    pats.push({use,times});
+  }
+  return pats;
+}
+function fitHeuristic(w, cnt, C, bestFit){
+  const bins=[];
+  for(let i=0;i<w.length;i++) for(let k=0;k<cnt[i];k++){
+    let pick=-1;
+    for(let b=0;b<bins.length;b++){
+      if(bins[b].rem>=w[i]){ if(!bestFit){pick=b;break;} if(pick<0||bins[b].rem<bins[pick].rem) pick=b; }
+    }
+    if(pick<0){ bins.push({rem:C,use:new Array(w.length).fill(0)}); pick=bins.length-1; }
+    bins[pick].rem-=w[i]; bins[pick].use[i]++;
+  }
+  const m=new Map();
+  for(const b of bins){ const key=b.use.join(','); if(m.has(key)) m.get(key).times++; else m.set(key,{use:b.use,times:1}); }
+  return [...m.values()];
+}
+function scorePats(pats, w, C){
+  let bars=0, sq=0;
+  for(const p of pats){ const used=p.use.reduce((a,u,i)=>a+u*w[i],0); bars+=p.times; sq+=p.times*(C-used)**2; }
+  return {bars, sq};
+}
+function solveGroup(pieces){
+  const K=10, kerf=Math.round(S.kerf*K), C=Math.round((S.stock-S.trim)*K)+kerf;
+  const byLen=new Map();
+  for(const p of pieces){ if(!byLen.has(p.len)) byLen.set(p.len,[]); byLen.get(p.len).push(p.code); }
+  const lens=[...byLen.keys()].sort((a,b)=>b-a);
+  const w=lens.map(l=>Math.round(l*K)+kerf), cnt=lens.map(l=>byLen.get(l).length);
+  const sumW=w.reduce((a,x,i)=>a+x*cnt[i],0);
+  let big=0; w.forEach((x,i)=>{ if(2*x>C) big+=cnt[i]; });
+  // Martello–Toth L2 lower bound
+  let LB=Math.max(Math.ceil(sumW/C), big);
+  const Ks=[...new Set(w.filter(x=>2*x<=C))];
+  for(const Kv of Ks){
+    let n1=0,n2=0,s2=0,s3=0;
+    w.forEach((x,i)=>{ if(x>C-Kv) n1+=cnt[i]; else if(2*x>C){ n2+=cnt[i]; s2+=x*cnt[i]; } else if(x>=Kv) s3+=x*cnt[i]; });
+    LB=Math.max(LB, n1+n2+Math.max(0,Math.ceil((s3-(n2*C-s2))/C)));
+  }
+  let best=null, bestS=null;
+  for(const pats of [seqHeuristic(w,cnt,C,true), seqHeuristic(w,cnt,C,false), fitHeuristic(w,cnt,C,false), fitHeuristic(w,cnt,C,true)]){
+    const s=scorePats(pats,w,C);
+    if(!best || s.bars<bestS.bars || (s.bars===bestS.bars && s.sq>bestS.sq)){ best=pats; bestS=s; }
+  }
+  // assign piece codes to bars
+  const queues=lens.map(l=>byLen.get(l).slice());
+  const patterns=best.map(p=>{
+    const cut=[]; p.use.forEach((u,i)=>{ for(let k=0;k<u;k++) cut.push(lens[i]); });
+    const sumLen=cut.reduce((a,b)=>a+b,0);
+    const leftover=Math.max(0, S.stock-S.trim-sumLen-S.kerf*cut.length);
+    const bars=[]; for(let t=0;t<p.times;t++) bars.push(cut.map(l=>({len:l, code:queues[lens.indexOf(l)].shift()||''})));
+    return {cut, times:p.times, sumLen, leftover, bars};
+  }).sort((a,b)=> b.times-a.times || a.leftover-b.leftover);
+  const nBars=patterns.reduce((a,p)=>a+p.times,0);
+  const totalLen=pieces.reduce((a,p)=>a+p.len,0);
+  let keep=0, scrap=0;
+  patterns.forEach(p=>{ if(p.leftover>=S.reuse && p.leftover>0) keep+=p.leftover*p.times; else scrap+=p.leftover*p.times; });
+  return {patterns, nBars, LB, totalLen, nPieces:pieces.length, keep, scrap, eff: totalLen/(nBars*S.stock)};
+}
+
+/* ---------- Run ---------- */
+$('#bRun').onclick = async ()=>{
+  const errs=[], groups=new Map();
+  const usable=S.stock-S.trim;
+  if(!(S.stock>0)) errs.push('Chiều dài cây ống phải lớn hơn 0.');
+  if(usable<=0) errs.push('Phần cắt bỏ đầu cây lớn hơn chiều dài cây.');
+  rows.forEach((r,i)=>{
+    if(!String(r.type||'').trim() && !String(r.len||'').trim() && !String(r.code||'').trim()) return;
+    const len=parseNum(r.len), qty=parseNum(r.qty);
+    if(!(len>0)){ errs.push(`Dòng ${i+1}: chiều dài "${r.len}" không hợp lệ.`); return; }
+    if(!(qty>0) || qty%1){ errs.push(`Dòng ${i+1}: số lượng "${r.qty}" phải là số nguyên dương.`); return; }
+    if(len>usable){ errs.push(`Dòng ${i+1}: đoạn ${fmt(len)} mm dài hơn phần dùng được của cây (${fmt(usable)} mm).`); return; }
+    const t=normType(r.type);
+    if(!groups.has(t)) groups.set(t,[]);
+    const L=Math.round(len*10)/10;
+    for(let k=0;k<qty;k++) groups.get(t).push({len:L, code:String(r.code||'').trim()});
+  });
+  const total=[...groups.values()].reduce((a,g)=>a+g.length,0);
+  if(!errs.length && !total) errs.push('Danh sách chưa có đoạn nào. Thêm dòng, dán từ Excel hoặc bấm "Dữ liệu mẫu".');
+  if(total>50000) errs.push(`Có ${fmt(total)} đoạn, vượt giới hạn 50.000 đoạn một lần tính. Hãy tách danh sách.`);
+  if(errs.length){ result=null; renderErrors(errs); return; }
+  $('#bRun').disabled=true; $('#bRun').textContent='Đang tính…';
+  await new Promise(r=>setTimeout(r,30));
+  const out=[];
+  for(const [type,pieces] of groups){ out.push({type, ...solveGroup(pieces)}); await new Promise(r=>setTimeout(r,0)); }
+  result={groups:out, S:{...S}}; dirty=false;
+  $('#bRun').disabled=false; $('#bRun').textContent='Tính phương án cắt';
+  renderResult();
+  if(matchMedia('(max-width:979px)').matches) $('#results').scrollIntoView({behavior:'smooth'});
+};
+
+function renderErrors(errs){
+  $('#results').innerHTML = `<div class="err"><b>Chưa tính được phương án.</b><ul>${errs.slice(0,30).map(e=>`<li>${esc(e)}</li>`).join('')}</ul>${errs.length>30?`<p>…và ${errs.length-30} lỗi khác.</p>`:''}</div>`;
+}
+
+function barHTML(cut, leftover, R){
+  const st=R.stock, pct=v=>(v/st*100).toFixed(3)+'%';
+  let h='';
+  if(R.trim>0) h+=`<div class="tr" style="width:${pct(R.trim)}" title="Cắt bỏ đầu ${fmt(R.trim)} mm"></div>`;
+  cut.forEach(l=>{
+    h+=`<div class="pc" style="width:${pct(l)}" title="${fmt(l)} mm">${l/st>0.075?fmt(l):''}</div>`;
+    if(R.kerf>0) h+=`<div class="kf" style="width:${pct(R.kerf)}"></div>`;
+  });
+  const cls = leftover>=R.reuse && leftover>0 ? 'k' : 'w';
+  h+=`<div class="lf ${cls}">${leftover/st>0.06?fmt(leftover):''}</div>`;
+  return `<div class="bar" role="img" aria-label="${cut.map(fmt).join(' + ')} mm, thừa ${fmt(leftover)} mm">${h}</div>`;
+}
+
+function renderResult(){
+  const G=result.groups, R=result.S;
+  const bars=G.reduce((a,g)=>a+g.nBars,0), len=G.reduce((a,g)=>a+g.totalLen,0);
+  const keep=G.reduce((a,g)=>a+g.keep,0), scrap=G.reduce((a,g)=>a+g.scrap,0);
+  let h=`<p class="stale" id="staleNote" ${dirty?'':'hidden'}>Danh sách hoặc thông số đã thay đổi. Bấm "Tính phương án cắt" để cập nhật.</p>
+  <div class="totals">
+    <div class="main"><b>${fmt(bars)}</b><span>cây ống ${fmt(R.stock)} mm cần dùng</span></div>
+    <div><b>${fmt1(len/(bars*R.stock)*100)}%</b><span>hiệu suất sử dụng</span></div>
+    <div><b>${fmt2(len/1000)} m</b><span>tổng chiều dài cắt</span></div>
+    <div><b>${fmt2(keep/1000)} m</b><span>đoạn thừa giữ lại (≥ ${fmt(R.reuse)} mm)</span></div>
+    <div><b>${fmt2(scrap/1000)} m</b><span>phế liệu</span></div>
+  </div>
+  <div class="actions">
+    <button class="btn small" id="bExport" hidden>Tải file Excel kết quả</button>
+    <button class="btn small" id="bCopy">Sao chép bảng để dán vào Excel</button>
+  </div>
+  <div class="legend"><span><i style="background:linear-gradient(180deg,var(--steel-a),var(--steel-c))"></i>Đoạn cắt</span><span><i style="background:var(--accent)"></i>Mạch cưa</span><span><i style="background:color-mix(in srgb,var(--keep) 30%,transparent)"></i>Đoạn thừa giữ lại</span><span><i style="background:color-mix(in srgb,var(--waste) 35%,transparent)"></i>Phế liệu</span></div>`;
+  G.forEach(g=>{
+    const badge = g.nBars===g.LB ? `<span class="badge ok">Đã đạt số cây tối thiểu</span>` : `<span class="badge lb" title="Không phương án nào dùng ít hơn số này. Con số thực tế tối thiểu có thể cao hơn.">Cận dưới lý thuyết: ${g.LB} cây</span>`;
+    h+=`<div class="group"><div class="ghead"><h3>${esc(g.type)}</h3>
+      <div class="gstat"><b>${fmt(g.nBars)} cây</b> cho ${fmt(g.nPieces)} đoạn, hiệu suất <b>${fmt1(g.eff*100)}%</b>${badge}</div></div>`;
+    g.patterns.forEach((p,pi)=>{
+      const cls = p.leftover>=R.reuse && p.leftover>0 ? 'k':'w';
+      const hasCode = p.bars.some(b=>b.some(x=>x.code));
+      h+=`<div class="pat"><div class="times"><b>×${p.times}</b><span>cây</span></div><div>
+        ${barHTML(p.cut,p.leftover,R)}
+        <div class="pinfo">Mẫu ${pi+1}: ${p.cut.map(fmt).join(' + ')} = <b>${fmt(p.sumLen)} mm</b>, còn thừa <span class="left ${cls}">${fmt(p.leftover)} mm${cls==='k'?' (giữ lại)':p.leftover>0?' (phế)':''}</span></div>
+        ${hasCode?`<details class="codes"><summary>Mã đoạn trên từng cây</summary><ol>${p.bars.map(b=>`<li>${b.map(x=>esc(x.code||'—')+' ('+fmt(x.len)+')').join(', ')}</li>`).join('')}</ol></details>`:''}
+      </div></div>`;
+    });
+    h+=`</div>`;
+  });
+  $('#results').innerHTML=h;
+  if(downloads && window.XLSX){ const b=$('#bExport'); b.hidden=false; b.onclick=exportXlsx; }
+  $('#bCopy').onclick=copyTable;
+}
+
+/* ---------- Export ---------- */
+function tables(){
+  const G=result.groups, R=result.S;
+  const sum=[['Loại ống','Số đoạn','Tổng dài cắt (m)','Số cây '+R.stock+' mm','Cận dưới lý thuyết','Hiệu suất (%)','Thừa giữ lại (m)','Phế liệu (m)']];
+  const pat=[['Loại ống','Mẫu','Số cây','Các đoạn (mm)','Tổng dùng (mm)','Thừa (mm)','Loại thừa']];
+  const det=[['Loại ống','Cây số','Mẫu','Thứ tự cắt','Chiều dài (mm)','Mã đoạn']];
+  G.forEach(g=>{
+    sum.push([g.type,g.nPieces,+(g.totalLen/1000).toFixed(3),g.nBars,g.LB,+(g.eff*100).toFixed(1),+(g.keep/1000).toFixed(3),+(g.scrap/1000).toFixed(3)]);
+    let barNo=0;
+    g.patterns.forEach((p,pi)=>{
+      const kind = p.leftover>=R.reuse && p.leftover>0 ? 'Giữ lại' : (p.leftover>0?'Phế':'');
+      pat.push([g.type,'Mẫu '+(pi+1),p.times,p.cut.join(' + '),p.sumLen,p.leftover,kind]);
+      p.bars.forEach(b=>{ barNo++; b.forEach((x,k)=>det.push([g.type,barNo,'Mẫu '+(pi+1),k+1,x.len,x.code])); });
+    });
+  });
+  return {sum,pat,det};
+}
+async function exportXlsx(){
+  const {sum,pat,det}=tables();
+  const wb=XLSX.utils.book_new();
+  const add=(rows,name,cols)=>{ const ws=XLSX.utils.aoa_to_sheet(rows); ws['!cols']=cols.map(w=>({wch:w})); XLSX.utils.book_append_sheet(wb,ws,name); };
+  add(sum,'Tong hop',[18,10,16,14,18,14,16,14]);
+  add(pat,'So do cat',[18,9,9,40,15,11,11]);
+  add(det,'Chi tiet tung cay',[18,9,9,11,15,16]);
+  const buf=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+  try{ await downloads.save({filename:'phuong-an-cat-ong.xlsx', data:new Blob([buf])}); toast('Đã lưu file Excel'); }
+  catch(e){ if(e && e.code==='declined') return; toast('Không lưu được file ('+(e&&e.code||'lỗi')+'). Hãy dùng nút sao chép.'); }
+}
+async function copyTable(){
+  const {pat}=tables();
+  const tsv=pat.map(r=>r.join('\t')).join('\n');
+  try{ await navigator.clipboard.writeText(tsv); toast('Đã sao chép. Dán vào Excel bằng Ctrl+V.'); }
+  catch(e){
+    const ta=document.createElement('textarea'); ta.value=tsv; document.body.appendChild(ta); ta.select();
+    let ok=false; try{ ok=document.execCommand('copy'); }catch(_){}
+    ta.remove(); toast(ok?'Đã sao chép. Dán vào Excel bằng Ctrl+V.':'Trình duyệt chặn sao chép. Hãy dùng nút tải file Excel.');
+  }
+}
+
+/* ---------- Init ---------- */
+load();
+for(const id in sMap) document.getElementById(id).value=S[sMap[id]];
+if(!rows.length) rows=[{type:'',len:'',qty:'1',code:''}];
+renderRows();
+if(!(window.claude && window.claude.use)){
+  downloads={save:async({filename,data})=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(data instanceof Blob?data:new Blob([data])); a.download=filename; document.body.appendChild(a); a.click(); a.remove(); return {status:'saved'}; }};
+}
+(async()=>{ try{ if(window.claude && claude.use){ downloads=await claude.use('downloads'); if(result && downloads && window.XLSX){ const b=$('#bExport'); if(b){ b.hidden=false; b.onclick=exportXlsx; } } } }catch(e){ downloads=null; } })();
+</script>
+</body>
+</html>
